@@ -1,0 +1,236 @@
+---
+title: "Tech Financials"
+date: "8/31/2021"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(haven)
+library(psych)
+library(here)
+
+```
+
+## Reading data
+
+
+We have a Stata file so we use `haven` package to read it.
+
+```{r}
+d1 <- haven::read_dta("tech_co_cstat_dta.zip") 
+
+```
+
+
+```{r}
+class(d1)
+```
+
+```{r}
+names(d1)
+```
+
+```{r}
+head(d1, n = 5)
+```
+
+```{r}
+tail(d1, n = 15)
+```
+
+
+```{r}
+d1[25:35,]
+```
+
+```{r}
+attributes(d1$gvkey)
+```
+```{r}
+attributes(d1$datadate)
+```
+
+```{r}
+attributes(d1$datadate)$label <- "Fiscal year end date"
+```
+
+
+```{r}
+attributes(d1$datadate)
+```
+```{r}
+glimpse(d1)
+```
+
+```{r}
+psych::describe(d1)
+```
+
+```{r}
+table(d1$gvkey)  
+```
+```{r}
+table(d1$conm)
+```
+```{r}
+count(d1, conm)                    
+
+```
+
+### Select()
+
+```{r}
+d2 <- select(d1, conm, datadate, sale, xrd)
+```
+
+
+```{r}
+names(d2)
+```
+
+```{r}
+d2 <- select(d1, -gvkey)
+```
+
+```{r}
+d3 <- d1 %>% 
+  select(-gvkey) %>% 
+  head()
+```
+
+```{r}
+d4 <- head(select(d1, -gvkey))
+```
+
+```{r}
+identical(d3, d4)
+```
+```{r}
+a <- 50
+
+if (a >= 50) {
+  print("the number is greater than 50")
+  } else(print("the number is smaller than 50"))
+```
+
+### Filter()
+
+```{r}
+mean(d1$sale, na.rm = FALSE)
+```
+```{r}
+head(d1$sale, 10)
+```
+
+```{r}
+d5 <- d1 %>% 
+  filter(sale > 0)
+```
+
+```{r}
+mean(d5$sale)
+```
+```{r}
+d6 <- d1 %>% 
+  filter(!is.na(sale))
+```
+
+Output the missing value status
+
+```{r echo = FALSE, eval=FALSE}
+!is.na(d1$sale)
+```
+
+```{r}
+head(d1$sale)
+```
+
+### Mutate()
+
+```{r}
+d7 <- d5 %>% 
+  mutate(profit_margin = oibdp / sale)
+```
+
+```{r}
+names(d7)
+```
+```{r}
+d7 <- d5 %>% 
+  mutate(profit_margin = oibdp / sale,
+         cash_holding = che / at,
+         rnd_intensity = xrd / sale,
+         debt_lt = ifelse(is.na(dltt), 0, dltt))
+```
+
+
+```{r}
+head(d5$dltt)
+```
+
+```{r}
+is.na(d5$dltt) %>% sum()
+```
+
+```{r}
+d7 %>% 
+  select(conm, datadate, sale) %>% 
+  head(20)
+```
+
+```{r}
+d8 <- d7 %>% 
+  arrange(conm, datadate) %>% 
+  group_by(conm) %>% 
+  mutate(sales_gr = (sale - lag(sale)) / lag(sale))
+
+d8
+
+```
+
+```{r}
+d8 %>% 
+  select(conm, datadate, sale, sales_gr) %>% 
+  head(200)
+```
+
+```{r}
+d7 %>% 
+  select(sale) %>%
+  summarize(sale_mean = mean(sale),
+            sale_median = median(sale),
+            sale_sd = sd(sale))
+```
+```{r}
+d7 %>% 
+  select(sale, at, xrd) %>%
+  summarize(across(everything()))
+```
+
+
+```{r}
+d7 %>% 
+  group_by(conm) %>% 
+  summarize(sale_mean = mean(sale),
+            sale_median = median(sale),
+            sale_sd = sd(sale)) %>% 
+  as.data.frame()
+```
+
+```{r}
+d5 %>% 
+  mutate(first_half_decade = ifelse(fyear < 2015, 1, 0)) %>% 
+  group_by(conm, first_half_decade) %>% 
+  summarize(sale_mean = mean(sale),
+            sale_median = median(sale),
+            sale_sd = sd(sale))
+```
+
+```{r}
+names(d8)
+```
+

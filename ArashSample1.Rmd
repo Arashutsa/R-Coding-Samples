@@ -1,0 +1,266 @@
+
+
+---
+title: "R Coding Samples"
+author: "Arash Hatamirad, ahatamirad@gmail.com"
+date: "9/9/2021"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+# Install required packages
+# 
+# install.packages("MASS")
+# install.packages("fBasics")
+# install.packages("moments")
+# install.packages("dplyr")
+# install.packages("haven")
+
+library(MASS)
+library(fBasics)
+library(moments)
+library(dplyr)
+library(haven)
+
+```
+
+### Initalizing
+
+```{r}
+# Read data
+d1 <- read_dta("tech_co_cstat_dta.zip")
+
+#psych::describe(d1)
+#glimpse(d1)
+#names(d1)
+#head(d1)
+#attributes(d1$tic)
+
+
+# put data for Sale>0 into d2
+d2 <- filter(d1,sale>0)
+
+
+```
+
+***
+
+### Q1  
+Print a data frame with the medians of cogs, emp, and xrd.  
+#### Answer:   
+
+```{r}
+
+d2 %>% 
+  select(cogs,emp,xrd) %>% 
+summarize(cogs=median(cogs,na.rm = TRUE),emp=median(emp,na.rm = TRUE),xrd=median(xrd,na.rm = TRUE))
+
+  
+  
+```
+
+***
+
+### Q2
+Print a data frame with the means of sale, oibdp, and xrd for Apple, Facebook, and Tesla. For this, you will need to follow these steps:  
+1. Filter only the observations pertaining to Apple, Facebook, and Tesla  
+2. Group by conm  
+3. Summarize across sale, oibdp, and xrd to get their means  
+4. Output it as data frame by using as.data.frame() function.  
+
+#### Answer:
+
+```{r}
+d2 %>% 
+  select(conm,sale,oibdp,xrd) %>% 
+  group_by(conm) %>% 
+  summarize(across(c(sale,oibdp,xrd),mean)) %>% 
+  filter(conm=="APPLE INC" | conm=="FACEBOOK INC" | conm=="TESLA INC") %>% 
+  as.data.frame()
+
+```
+
+***
+
+### Q3
+Round all the numeric variables in the above data frame to 1 decimal place. Output as a data frame using as.data.frame() function.   
+
+#### Answer:
+
+
+```{r}
+
+d2 %>% 
+  select(conm,sale,oibdp,xrd) %>% 
+  group_by(conm) %>% 
+  summarize(across(c(sale,oibdp,xrd),mean)) %>% 
+  filter(conm=="APPLE INC" | conm=="FACEBOOK INC" | conm=="TESLA INC") %>% 
+  mutate(across(where(is.numeric),round,1)) %>% 
+  as.data.frame()
+   
+```
+
+
+***
+
+### Q4
+In the finance literature, a common (but incorrect) practice is to assume that the missing advertising is 0. We will use this adjustment to xad and create a new variable adv and save it in a new object d3.My own research shows that this is highly misleading. However, my solution to this issue is complex and requires application of machine learning.
+
+The first six values of d3 when xad is NA are as follows: 
+
+#### Answer:
+
+
+```{r}
+# Make d3 
+d3 <- d2 %>% 
+  mutate(adv=ifelse(is.na(xad),0,xad)) %>% 
+  as.data.frame()
+
+# Make output report 
+d3 %>% 
+  select(conm,datadate,xad,adv) %>% 
+  filter(is.na(xad)==TRUE) %>% 
+  as.data.frame() %>% 
+  head()
+
+```
+
+***
+
+### Q5
+Using d3, create the following variables and print first 8 rows for Netflix and the new columns along with conm and datadate:  
+1. Return on assets (roa) = oibdp / at  
+2. Free cash flow (fcf) = oancf / che  
+3. Strategic emphasis (strat_emph) = (adv - xrd) / at  
+
+#### Answer:
+
+```{r}
+# make new columns in d3
+f=d3 %>% 
+  mutate(roa=oibdp/at,fcf=oancf/che,strat_emph=(adv-xrd)/at) %>% 
+  arrange(conm,datadate) %>% 
+  filter(conm=='NETFLIX INC') %>% 
+  select(conm,datadate,roa,fcf,strat_emph) %>% 
+  mutate(across(roa,signif,3),across(roa,as.numeric)) %>%
+  as.data.frame() %>% 
+  head(n=8)
+  
+
+d3 %>% 
+  mutate(roa=oibdp/at,fcf=oancf/che,strat_emph=(adv-xrd)/at) %>% 
+  arrange(conm,datadate) %>% 
+  filter(conm=='NETFLIX INC') %>% 
+  select(conm,datadate,roa,fcf,strat_emph) %>% 
+  mutate(across(roa,round,4),across(fcf,round,3),across(strat_emph,round,4)) %>%
+  as.data.frame() %>% 
+  head(n=8)
+
+```
+
+
+***
+
+### Q6
+You want to know how many profitable years each of the sample company experienced. For this follow these steps:  
+1. Create an indicator variable (dummy variable) called profit_ind such that when oibdp > 0 this variable is 1. Otherwise it is 0.  
+2. Group by company names   
+3. Summarize profit_ind by taking its sum. Also, get the total number of observations for each company.  
+ 
+
+#### Answer:
+
+```{r}
+
+
+d3 %>% 
+  mutate(profit_ind=ifelse(oibdp>0,1,0)) %>% 
+  group_by(conm) %>% 
+  summarize(profit_years=sum(profit_ind),total_years=NROW(conm)) %>% 
+  as.data.frame()
+
+
+```
+
+
+***
+
+### Q7
+Find the average annual stock returns of all the companies. Follow these steps:  
+1. Arrange the data set by conm and datadate.  
+2. Group by conm  
+3. Calculate stock return stk_ret by taking the difference between prcc_f and its lag and then divide the difference by the lag of prcc_f    
+4. Summarize to get the mean of the stock returns stk_ret_mean.  
+5. Display the average stock returns in percentage format.  
+ 
+
+#### Answer:
+
+```{r}
+
+d3 %>% 
+  arrange(conm,datadate) %>% 
+  group_by(conm) %>% 
+  mutate(stk_ret=(prcc_f-lag(prcc_f))/lag(prcc_f)) %>% 
+  select(conm, stk_ret) %>%
+  #mutate(stk_ret=ifelse(is.na(stk_ret)==TRUE,0,stk_ret)) %>%
+  summarize(stk_ret_mean=mean(stk_ret,na.rm=TRUE)*100) %>% 
+  mutate(across(stk_ret_mean,round,3)) %>% 
+  mutate(across(stk_ret_mean,paste0,'%')) %>% 
+  as.data.frame()
+
+```
+
+
+***
+
+### Q8
+In many statistical and machine learning applications, we use scaled variables instead of the original variables. A scaled variable is typically created by subtracting the sample mean of the variable from the variable and dividing it by its standard deviation. There is a scale() function in base R which can directly do it.  
+
+You want to create a scaled variable for sale but separately for each company. Therefore, you can’t use the mean and standard deviation of sale for the entire sample.   Instead, you have to calculate these statistics for each company separately and then create a scaled variable. Follow these steps:  
+
+1. Group by conm  
+2. Summarize sale to get the mean (sale_mean) and the standard deviation (sale_sd)  
+3. Assign this data frame to d3_sum  
+4. Join d3 and d3_sum by conm  
+5. Create sale_scaled by subtracting sale_mean from sale and dividing this difference by sale_sd  
+Print the first 10 rows for Twitter with conm, sale, sale_scaled, sale_mean, and sale_sd using as.data.frame()  
+
+#### Answer:
+
+```{r}
+d3_sum <- d3 %>% 
+  group_by(conm) %>%
+  summarize(sale_mean=mean(sale),sale_sd=sd(sale)) %>% 
+  as.data.frame()
+
+merge(x=d3,y=d3_sum,by="conm") %>% 
+  mutate(sale_scaled=(sale-sale_mean)/sale_sd) %>% 
+  filter(conm=="TWITTER INC") %>% 
+  select(conm,sale,sale_scaled,sale_mean,sale_sd) %>% 
+  as.data.frame() %>% 
+  print()
+
+
+  
+
+
+
+
+
+```
+
+
+
+
+
+*** 
+End of report
+
